@@ -759,3 +759,165 @@ shape: (5, 5)
 └──────────────┴─────────────────────────┴────────────────────┴────────────┴─────────────┘
 diff 메서드를 활용한 결과와 shift후에 연산을 진행한 결과를 비교해보자.
 '''
+
+
+# ------------------------------------------------------------
+# .str.contains(pattern)
+# .str.replace_all(pattern, replace_string)
+# .str.extract_all(pattern)
+# ------------------------------------------------------------
+'''
+판다스와 마찬가지로 str 타입 데이터에 대해서, 검색, 교체, 추출 등을 진행할 수 있다.
+정규표현식 사용도 가능하며,
+해당 기능은 Rust를 통해 벡터 연산 진행되기 때문에 속도가 매우 빠르다.
+contains, replace_all, extract_all 모두 정규표현식 적용이 가능하며,
+체이닝을 통해 한 컬럼에 여러 표현을 적용하는 것이 가능하다.
+
+map_elements를 이용할 경우 행 하나하나 지정 함수가 적용되는 것이기 때문에 속도 측면에서 매우 비효율적이다.
+'''
+df = pl.DataFrame({
+					    "html_text": [
+									        "<p>Hello &amp; welcome!</p>",
+									        "<div>Error: 404 &lt;Not Found&gt;</div>",
+									        "<span>Price: $100 &amp; tax</span>",
+									        "<script>alert('xss')</script><b>Bold</b>"
+									    ],
+					    "contact_info": [
+										        "Email: alice@example.com, bob@test.org",
+										        "Phone: 010-1234-5678",
+										        "No contact here",
+										        "Emails: charlie@domain.com; Phone: 02-8765-4321"
+										    ],
+					    "message": [
+								        "foo bar baz foo",
+								        "no match here",
+								        "foo, foo, foo",
+								        ""
+								    ]
+})
+print(df)
+'''
+shape: (4, 3)
+┌─────────────────────────────────┬─────────────────────────────────┬─────────────────┐
+│ html_text                       ┆ contact_info                    ┆ message         │
+│ ---                             ┆ ---                             ┆ ---             │
+│ str                             ┆ str                             ┆ str             │
+╞═════════════════════════════════╪═════════════════════════════════╪═════════════════╡
+│ <p>Hello &amp; welcome!</p>     ┆ Email: alice@example.com, bob@… ┆ foo bar baz foo │
+│ <div>Error: 404 &lt;Not Found&… ┆ Phone: 010-1234-5678            ┆ no match here   │
+│ <span>Price: $100 &amp; tax</s… ┆ No contact here                 ┆ foo, foo, foo   │
+│ <script>alert('xss')</script><… ┆ Emails: charlie@domain.com; Ph… ┆                 │
+└─────────────────────────────────┴─────────────────────────────────┴─────────────────┘
+'''
+
+# contains
+df_contains = df.select(
+								pl.col('message'),
+								pl.col('message')
+								.str.contains('foo')
+								.alias('has_foo')
+							)
+
+# replace_all
+df_replace = df.select(
+								pl.col('html_text'),
+								pl.col('html_text')
+								.str.replace_all(r"<[^>]+>", "", literal = False) #정규표현식 사용
+								.str.replace_all("&amp;", "&", literal = True) #정규표현식이 아니라 문자열 그대로 사용
+								.str.replace_all("&lt;", "<", literal = False)
+								.str.replace_all("&gt;", ">", literal = False)
+								.alias('clean_html')
+							)
+
+# extract_all
+df_extract = df.select(
+								pl.col('contact_info'),
+								pl.col('contact_info')
+								.str.extract_all(r"[\w\.-]+@[\w\.-]+")
+								.alias('emails'),
+								pl.col('contact_info')
+								.str.extract_all(r"[0-9]{2,3}-[0-9]{3,4}-[0-9]{4}")
+								.alias('phones')
+							)
+
+print(df_contains)
+print(df_replace)
+print(df_extract)
+'''
+shape: (4, 2)
+┌─────────────────┬─────────┐
+│ message         ┆ has_foo │
+│ ---             ┆ ---     │
+│ str             ┆ bool    │
+╞═════════════════╪═════════╡
+│ foo bar baz foo ┆ true    │
+│ no match here   ┆ false   │
+│ foo, foo, foo   ┆ true    │
+│                 ┆ false   │
+└─────────────────┴─────────┘
+
+shape: (4, 2)
+┌─────────────────────────────────┬────────────────────────┐
+│ html_text                       ┆ clean_html             │
+│ ---                             ┆ ---                    │
+│ str                             ┆ str                    │
+╞═════════════════════════════════╪════════════════════════╡
+│ <p>Hello &amp; welcome!</p>     ┆ Hello & welcome!       │
+│ <div>Error: 404 &lt;Not Found&… ┆ Error: 404 <Not Found> │
+│ <span>Price: $100 &amp; tax</s… ┆ Price: $100 & tax      │
+│ <script>alert('xss')</script><… ┆ alert('xss')Bold       │
+└─────────────────────────────────┴────────────────────────┘
+
+
+shape: (4, 3)
+┌─────────────────────────────────┬─────────────────────────────────┬───────────────────┐
+│ contact_info                    ┆ emails                          ┆ phones            │
+│ ---                             ┆ ---                             ┆ ---               │
+│ str                             ┆ list[str]                       ┆ list[str]         │
+╞═════════════════════════════════╪═════════════════════════════════╪═══════════════════╡
+│ Email: alice@example.com, bob@… ┆ ["alice@example.com", "bob@tes… ┆ []                │
+│ Phone: 010-1234-5678            ┆ []                              ┆ ["010-1234-5678"] │
+│ No contact here                 ┆ []                              ┆ []                │
+│ Emails: charlie@domain.com; Ph… ┆ ["charlie@domain.com"]          ┆ ["02-8765-4321"]  │
+└─────────────────────────────────┴─────────────────────────────────┴───────────────────┘
+'''
+
+# ------------------------------------------------------------
+# pl.when(조건1).then(결과1).when(조건2).then(결과2)....when(조건N).then(결과N).otherwise(나머지).alias()
+# pl.case().when(조건1, 결과1).when(조건2, 결과2)....when(조건N, 결과N).otherwise(나머지).alias()
+# ------------------------------------------------------------
+'''
+SQL의 CASE문과 비슷한 형태로 사용할 수 있다.
+여러 조건을 적용할 때도 간단하게 체이닝을 통해 연결만 해주면 되기 때문에 사용이 간편하다.
+'''
+df.with_columns(
+						pl
+						.when(pl.col('contact_info').str.contains('[0-9]{2,3}-[0-9]{3,4}-[0-9]{4}'))
+						.then(pl.lit('phone'))
+
+						.when(pl.col('contact_info').str.contains('[a-zA-Z\.-]+@[a-zA-Z\.-]+'))
+						.then(pl.lit('email'))
+
+						.when(pl.col('contact_info').str.contains('[0-9]{2,3}-[0-9]{3,4}-[0-9]{4}')
+						     & pl.col('contact_info').str.contains('[a-zA-Z\.-]+@[a-zA-Z\.-]+'))
+						.then(pl.lit('both'))
+						.otherwise(pl.lit('nothing'))
+						.alias('contact_method')
+					)
+'''
+shape: (4, 4)
+┌───────────────────────────────┬───────────────────────────────┬─────────────────┬────────────────┐
+│ html_text                     ┆ contact_info                  ┆ message         ┆ contact_method │
+│ ---                           ┆ ---                           ┆ ---             ┆ ---            │
+│ str                           ┆ str                           ┆ str             ┆ str            │
+╞═══════════════════════════════╪═══════════════════════════════╪═════════════════╪════════════════╡
+│ <p>Hello &amp; welcome!</p>   ┆ Email: alice@example.com,     ┆ foo bar baz foo ┆ email          │
+│                               ┆ bob@…                         ┆                 ┆                │
+│ <div>Error: 404 &lt;Not       ┆ Phone: 010-1234-5678          ┆ no match here   ┆ phone          │
+│ Found&…                       ┆                               ┆                 ┆                │
+│ <span>Price: $100 &amp;       ┆ No contact here               ┆ foo, foo, foo   ┆ nothing        │
+│ tax</s…                       ┆                               ┆                 ┆                │
+│ <script>alert('xss')</script> ┆ Emails: charlie@domain.com;   ┆                 ┆ phone          │
+│ <…                            ┆ Ph…                           ┆                 ┆                │
+└───────────────────────────────┴───────────────────────────────┴─────────────────┴────────────────┘
+'''
