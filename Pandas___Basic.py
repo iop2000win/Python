@@ -386,6 +386,45 @@ series : {열 : Series, 열 : Series}
 split : { index : [ 행, 행 ], columns : [ 열, 열 ], data : [ 값, 값 ] }
 records : [ { 열 : 값 , 열 : 값 }, { 열 : 값, 열 : 값 } ]
 index : { 행 : {열 : 값, 열 : 값}, 행 : {열 : 값, 열 : 값} }
+
+orient 변수에 어떤 값을 주냐에 따라 데이터 프레임을 딕셔너리 형태로 변환하는 포맷이 달라진다.
+여러가지 형태가 주어지지만, 개인적인 경험으로 많이 사용하는 형태에 대해서만 집중적으로 살펴보자.
+데이터 프레임을 딕셔너리 형태로 바꾸려고 했던 경우는
+인덱스 별로 컬럼 값을 조회하기 위한 경우가 많았다.
+컬럼별로 데이터를 조회하거나, 컬럼과 인덱스 모두를 통해 데이터를 조회하는 경우는
+데이터 프레임을 그대로 다루는 것이 더 편한 경우가 많았던 것 같다.
+
+- orient = 'records' : 인덱스 별로 컬럼:값 을 조회
+- orient = 'list' : 컬럼 별로 값을 리스트 형태로 조회
+- orient = 'index' : 인덱스 별로 컬럼:값으로 조회
+'''
+data = {
+    'A': [1, 2, 3],
+    'B': [4, 5, 6],
+    'C': [7, 8, 9]
+}
+df = pd.DataFrame(data)
+print(df)
+
+print(df.to_dict(orient = 'record'))
+print(df.to_dict(orient = 'list'))
+print(df.to_dict(orient = 'index'))
+'''
+   A  B  C
+0  1  4  7
+1  2  5  8
+2  3  6  9
+
+# records
+[{'A': 1, 'B': 4, 'C': 7}, {'A': 2, 'B': 5, 'C': 8}, {'A': 3, 'B': 6, 'C': 9}]
+
+# list
+{'A': [1, 2, 3], 'B': [4, 5, 6], 'C': [7, 8, 9]}
+
+# index
+{0: {'A': 1, 'B': 4, 'C': 7},
+ 1: {'A': 2, 'B': 5, 'C': 8},
+ 2: {'A': 3, 'B': 6, 'C': 9}}
 '''
 
 
@@ -423,9 +462,14 @@ print(df.swaplevel('letter', 'number').sort_index(level = 'number'))
 # print(df.swaplevel(0, 1).sort_index(level = 'number'))
 '''
 [['A', 'B'], [1, 2]]
+
 ['letter', 'number']
+
+# get_level_values
 Index(['A', 'A', 'B', 'B'], dtype='object', name='letter')
 Index(['A', 'A', 'B', 'B'], dtype='object', name='letter')
+
+# swaplevel
                value
 number letter       
 1      A          10
